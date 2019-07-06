@@ -1,59 +1,192 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <p>
-      For a guide and recipes on how to configure / customize this project,<br>
-      check out the
-      <a href="https://cli.vuejs.org" target="_blank" rel="noopener">vue-cli documentation</a>.
-    </p>
-    <h3>Installed CLI Plugins</h3>
-    <ul>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-babel" target="_blank" rel="noopener">babel</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-pwa" target="_blank" rel="noopener">pwa</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-eslint" target="_blank" rel="noopener">eslint</a></li>
-    </ul>
-    <h3>Essential Links</h3>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank" rel="noopener">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank" rel="noopener">Forum</a></li>
-      <li><a href="https://chat.vuejs.org" target="_blank" rel="noopener">Community Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="https://news.vuejs.org" target="_blank" rel="noopener">News</a></li>
-    </ul>
-    <h3>Ecosystem</h3>
-    <ul>
-      <li><a href="https://router.vuejs.org" target="_blank" rel="noopener">vue-router</a></li>
-      <li><a href="https://vuex.vuejs.org" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-devtools#vue-devtools" target="_blank" rel="noopener">vue-devtools</a></li>
-      <li><a href="https://vue-loader.vuejs.org" target="_blank" rel="noopener">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">awesome-vue</a></li>
-    </ul>
-  </div>
+  <v-container>
+    <v-layout row>
+      <v-flex xs12 sm10 offset-sm1 md8 offset-md2>
+        <v-card>
+          <v-toolbar flat dark style="z-index: 1000;">
+            <v-btn
+              icon
+              :loading="isStreaming"
+              @click="isStreaming ? stopStream() : startAddStream()"
+            >
+              <v-icon>mdi-account-convert</v-icon>
+            </v-btn>
+            <v-toolbar-title>{{`${isStreaming ? 'Streaming' : 'No longer streaming'} users/`}}</v-toolbar-title>
+            <v-spacer></v-spacer>
+            <v-btn icon @click="generateRandomProfile()">
+              <v-icon>mdi-account-plus</v-icon>
+            </v-btn>
+            <v-btn icon :disabled="!userList.length" @click="deleteAllUsers()">
+              <v-icon>mdi-account-multiple-minus</v-icon>
+            </v-btn>
+          </v-toolbar>
+          <div>
+            <split-pane
+              v-if="!mobileDevice"
+              :min-percent="20"
+              :default-percent="50"
+              split="vertical"
+            >
+              <template slot="paneL">
+                <userlist :list="userList" />
+              </template>
+              <template slot="paneR">
+                <userprofile />
+              </template>
+            </split-pane>
+            <div v-else>
+              <userlist :list="userList" />
+            </div>
+          </div>
+        </v-card>
+      </v-flex>
+    </v-layout>
+  </v-container>
 </template>
 
 <script>
+// STILL USING CLIENT LEYLO
+import leylo from "@/leylo";
+import { isMobile, isLandscape } from "@inventsable/simpledevice";
+
+// Various UI components/helpers
+import userlist from "./userlist";
+import userprofile from "./userprofile";
+import splitPane from "vue-splitpane";
+
+// Various Node helpers
+// import ThisPersonDoesNotExist from "thispersondoesnotexist-js";
+// const dnte = new ThisPersonDoesNotExist();
+const randomAvatar = require("random-avatar");
+const randomProfile = require("random-profile-generator");
+
 export default {
-  name: 'HelloWorld',
-  props: {
-    msg: String
+  components: {
+    userlist,
+    userprofile,
+    "split-pane": splitPane
+  },
+  data: () => ({
+    local: false,
+    userList: [],
+    isStreaming: false,
+    canStream: true,
+    mobileDevice: null
+  }),
+  computed: {
+    app() {
+      return this.$root.$children[0];
+    }
+  },
+  async mounted() {
+    this.app.main = this;
+    this.startAddStream();
+    this.startRemoveStream();
+
+    this.mobileDevice = this.checkIfMobile();
+    window.addEventListener("resize", () => {
+      this.mobileDevice = this.checkIfMobile();
+    });
+  },
+  methods: {
+    checkIfMobile() {
+      return (
+        window.innerWidth < 800 ||
+        typeof window.orientation !== "undefined" ||
+        navigator.userAgent.indexOf("IEMobile") !== -1
+      );
+    },
+    addUserIfNotInList(user) {
+      if (!this.userList.some(person => person.fullName == user.fullName)) {
+        console.log(`Adding ${user.fullName}`);
+        this.userList.push(user);
+      } else {
+        console.log(`${user.fullName} already exists`);
+      }
+    },
+    stopStream() {
+      this.canStream = false;
+    },
+    async startAddStream() {
+      this.canStream = true;
+      this.isStreaming = (await !this.basicStream("users")) ? false : true;
+    },
+    async startRemoveStream() {
+      return await leylo.streamCollection(
+        "users",
+        user => {
+          this.userList = this.userList.filter(item => {
+            return item.fullName !== user.data().fullName;
+          });
+        },
+        "removed",
+        false
+      );
+    },
+    async basicStream(collection) {
+      return this.canStream
+        ? await leylo.streamCollection(
+            collection,
+            user => {
+              console.log(`${user.fullName} added to Firestore!`);
+              this.addUserIfNotInList(user);
+            },
+            "added"
+          )
+        : null;
+    },
+    async generateRandomProfile() {
+      let newUser = randomProfile.profile();
+
+      return await leylo.addDoc("users", newUser).then(ref => {
+        leylo.getDocById("users", ref).then(doc => {
+          this.app.activeUser = doc;
+        });
+      });
+    },
+    async deleteAllUsers() {
+      this.app.activeUser = null;
+      this.isStreaming = false;
+      this.canStream = true;
+
+      let fulldeletion = await leylo.deleteCollection("users");
+      let completed = false;
+      fulldeletion.forEach(result => {
+        console.log(result);
+        if (!result) completed = false;
+      });
+      if (completed) return (this.userList = []);
+    },
+    async demonstrateFieldDeletion() {
+      let deletion = await leylo.deleteFieldByDocId(
+        "users",
+        "Inventsable",
+        "location"
+      );
+      console.log(deletion);
+    }
+  },
+  created() {
+    // if (!this.local) this.validateDBEntry(this.$route.params.id);
   }
-}
+};
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped>
-h3 {
-  margin: 40px 0 0;
+<style>
+.demotoolbar {
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 10%;
+  background-color: rgba(0, 0, 0, 0.05);
 }
-ul {
-  list-style-type: none;
-  padding: 0;
+
+.sample {
+  background-color: red;
+  width: 100%;
+  height: 100%;
 }
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
-a {
-  color: #42b983;
+
+.vue-splitter-container[data-v-566a42b8] {
+  position: inherit;
 }
 </style>

@@ -1,4 +1,6 @@
-# Demo for leylo [![npm version](https://badge.fury.io/js/leylo.svg)](https://badge.fury.io/js/leylo)
+# Demo for [leylo](https://github.com/Inventsable/leylo) [![npm version](https://badge.fury.io/js/leylo.svg)](https://badge.fury.io/js/leylo) [![npm](https://img.shields.io/npm/dm/leylo.svg)]()
+
+[![NPM](https://nodei.co/npm/leylo.png)](https://nodei.co/npm/leylo/)
 
 | [Installation](https://github.com/Inventsable/leylo#-installation) | [Requirements](https://github.com/Inventsable/leylo#-requirements) | [Usage](https://github.com/Inventsable/leylo#-usage) | [Demo](https://github.com/Inventsable/leylo-test) | [📚 API](https://github.com/Inventsable/leylo#-api) |
 | ------------------------------------------------------------------ | :----------------------------------------------------------------: | :--------------------------------------------------: | :-----------------------------------------------: | :-------------------------------------------------: |

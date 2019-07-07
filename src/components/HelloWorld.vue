@@ -4,11 +4,7 @@
       <v-flex xs12 sm10 offset-sm1 md8 offset-md2>
         <v-card>
           <v-toolbar flat dark style="z-index: 1000;">
-            <v-btn
-              icon
-              :loading="isStreaming"
-              @click="isStreaming ? stopStream() : startAddStream()"
-            >
+            <v-btn icon :loading="isStreaming" @click="ensureStreamStarts(true)">
               <v-icon>mdi-account-convert</v-icon>
             </v-btn>
             <v-toolbar-title>{{`${isStreaming ? 'Streaming' : 'No longer streaming'} users/`}}</v-toolbar-title>
@@ -70,18 +66,29 @@ export default {
     local: false,
     userList: [],
     isStreaming: false,
+    isAltStreaming: false,
     canStream: true,
-    mobileDevice: null
+    mobileDevice: null,
+    userStream: null
   }),
   computed: {
     app() {
       return this.$root.$children[0];
     }
   },
+  watch: {
+    userList(entries) {
+      if (entries.length == 0) this.isStreaming = false;
+    }
+  },
   async mounted() {
     this.app.main = this;
-    this.startAddStream();
-    this.startRemoveStream();
+
+    // In case collection 'users' is empty on launch
+    this.ensureStreamStarts().then(() => {
+      this.startAddStream();
+      this.startRemoveStream();
+    });
 
     this.mobileDevice = this.checkIfMobile();
     window.addEventListener("resize", () => {
@@ -89,23 +96,19 @@ export default {
     });
   },
   methods: {
-    checkIfMobile() {
-      return (
-        window.innerWidth < 800 ||
-        typeof window.orientation !== "undefined" ||
-        navigator.userAgent.indexOf("IEMobile") !== -1
-      );
-    },
-    addUserIfNotInList(user) {
-      if (!this.userList.some(person => person.fullName == user.fullName)) {
-        console.log(`Adding ${user.fullName}`);
-        this.userList.push(user);
+    async ensureStreamStarts(forceStream = false) {
+      let users = await leylo.getCollection("users");
+      if (!users) {
+        let newUser = this.generateRandomProfile();
+        if (forceStream)
+          newUser.then(() => {
+            this.startAddStream();
+            this.startRemoveStream();
+          });
       } else {
-        console.log(`${user.fullName} already exists`);
+        this.startAddStream();
+        this.startRemoveStream();
       }
-    },
-    stopStream() {
-      this.canStream = false;
     },
     async startAddStream() {
       this.canStream = true;
@@ -127,17 +130,44 @@ export default {
       return this.canStream
         ? await leylo.streamCollection(
             collection,
-            user => {
-              console.log(`${user.fullName} added to Firestore!`);
-              this.addUserIfNotInList(user);
-            },
+            this.addUserIfNotInList,
             "added"
           )
         : null;
     },
+    addUserIfNotInList(user) {
+      if (!this.userList.some(person => person.fullName == user.fullName)) {
+        this.userList.push(user);
+      }
+    },
+    checkIfMobile() {
+      return (
+        window.innerWidth < 800 ||
+        typeof window.orientation !== "undefined" ||
+        navigator.userAgent.indexOf("IEMobile") !== -1
+      );
+    },
+    async startAltStream() {
+      this.userStream = await leylo.streamPath(
+        "users",
+        user => {
+          console.log(`Hello ${user.data().firstName}`);
+          return `Hello ${user.data().firstName}`;
+        },
+        "added",
+        false
+      );
+      this.isAltStreaming = true;
+    },
+    async stopAltStream() {
+      let unsubscribe = this.userStream();
+      this.isAltStreaming = false;
+    },
+    stopStream() {
+      this.canStream = false;
+    },
     async generateRandomProfile() {
       let newUser = randomProfile.profile();
-
       return await leylo.addDoc("users", newUser).then(ref => {
         leylo.getDocById("users", ref).then(doc => {
           this.app.activeUser = doc;
@@ -152,7 +182,6 @@ export default {
       let fulldeletion = await leylo.deleteCollection("users");
       let completed = false;
       fulldeletion.forEach(result => {
-        console.log(result);
         if (!result) completed = false;
       });
       if (completed) return (this.userList = []);

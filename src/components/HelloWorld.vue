@@ -42,7 +42,7 @@
 
 <script>
 // STILL USING CLIENT LEYLO
-import leylo from "@/leylo";
+import leylo from "leylo";
 import { isMobile, isLandscape } from "@inventsable/simpledevice";
 
 // Various UI components/helpers

@@ -20,7 +20,7 @@
 </template>
 
 <script>
-import leylo from "@/leylo";
+import leylo from "leylo";
 
 export default {
   name: "userlist",

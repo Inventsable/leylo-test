@@ -12,6 +12,7 @@
     "@mdi/font": "^3.7.95",
     "core-js": "^2.6.5",
     "firebase": "^6.2.4",
+    "leylo": "^1.0.16",
     "random-avatar": "^1.0.1",
     "random-profile-generator": "^2.3.0",
     "register-service-worker": "^1.6.2",
